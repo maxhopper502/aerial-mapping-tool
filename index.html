@@ -52,15 +52,15 @@
   </div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.geometryutil/0.10.0/leaflet.geometryutil.min.js"></script>
   <script>
     const map = L.map("map").setView([-34.5, 135.5], 9);
 
-    // Satellite imagery
-   
-   tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: '&copy; Esri',
-      maxZoom: 19
+    // OpenStreetMap base layer (reliable with GitHub Pages)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
+
     const drawnItems = new L.FeatureGroup().addTo(map);
     const exclusionItems = new L.FeatureGroup().addTo(map);
     const labels = [];
@@ -117,4 +117,26 @@
       labels.push(label);
 
       if (drawType === 'paddock') {
-        drawnItems.addLayer(
+        drawnItems.addLayer(layer);
+      } else {
+        exclusionItems.addLayer(layer);
+      }
+
+      updateTotalArea();
+    });
+
+    function updateTotalArea() {
+      let total = 0;
+      drawnItems.eachLayer(layer => {
+        const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]) / 10000;
+        total += area;
+      });
+      exclusionItems.eachLayer(layer => {
+        const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]) / 10000;
+        total -= area;
+      });
+      console.log(`Net area: ${total.toFixed(2)} ha`);
+    }
+  </script>
+</body>
+</html>
