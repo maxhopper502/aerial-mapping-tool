@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Aerial Mapping Tool</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
+  />
+  <style>
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+    }
+    .custom-buttons {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 1001;
+    }
+    .custom-buttons button {
+      padding: 6px 10px;
+      font-size: 14px;
+      border: none;
+      border-radius: 4px;
+      background: white;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+    .hectare-label {
+      font-weight: bold;
+      color: #000;
+      background-color: rgba(255, 255, 255, 0.7);
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="custom-buttons">
+    <button id="drawPaddock">➕ Paddock</button>
+    <button id="drawExclusion">🚫 Exclusion</button>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.geometryutil/0.10.0/leaflet.geometryutil.min.js"></script>
+  <script>
+    const map = L.map("map").setView([-34.5, 135.5], 9);
+
+    // ✅ This tile layer always works
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const drawnItems = new L.FeatureGroup().addTo(map);
+    const exclusionItems = new L.FeatureGroup().addTo(map);
+    const labels = [];
+
+    const drawControl = new L.Control.Draw({
+      edit: {
+        featureGroup: drawnItems,
+        remove: true
+      },
+      draw: {
+        polygon: {
+          allowIntersection: false,
+          showArea: true,
+          shapeOptions: { color: '#3388ff' },
+        },
+        marker: false,
+        polyline: false,
+        rectangle: false,
+        circle: false,
+        circlemarker: false
+      }
+    });
+    map.addControl(drawControl);
+
+    let drawType = 'paddock';
+
+    document.getElementById("drawPaddock").addEventListener("click", () => {
+      drawType = 'paddock';
+      new L.Draw.Polygon(map, drawControl.options.draw.polygon).enable();
+    });
+
+    document.getElementById("drawExclusion").addEventListener("click", () => {
+      drawType = 'exclusion';
+      new L.Draw.Polygon(map, {
+        polygon: {
+          allowIntersection: false,
+          showArea: true,
+          shapeOptions: { color: '#ff0000', fillOpacity: 0.3 }
+        }
+      }).enable();
+    });
+
+    map.on(L.Draw.Event.CREATED, (e) => {
+      const layer = e.layer;
+      const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]) / 10000;
+
+      const center = layer.getBounds().getCenter();
+      const label = L.marker(center, {
+        icon: L.divIcon({
+          className: 'hectare-label',
+          html: `${area.toFixed(2)} ha`
+        })
+      }).addTo(map);
+      labels.push(label);
+
+      if (drawType === 'paddock') {
+        drawnItems.addLayer(layer);
+      } else {
+        exclusionItems.addLayer(layer);
+      }
+
+      updateTotalArea();
+    });
+
+    function updateTotalArea() {
+      let total = 0;
+      drawnItems.eachLayer(layer => {
+        const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]) / 10000;
+        total += area;
+      });
+      exclusionItems.eachLayer(layer => {
+        const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]) / 10000;
+        total -= area;
+      });
+      console.log(`Net area: ${total.toFixed(2)} ha`);
+    }
+  </script>
+</body>
+</html>
